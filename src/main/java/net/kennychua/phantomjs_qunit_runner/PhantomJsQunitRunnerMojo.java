@@ -10,6 +10,8 @@ import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.StringWriter;
+import java.util.ArrayList;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.plugin.AbstractMojo;
@@ -62,12 +64,15 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	private boolean ignoreFailures;
 
 	/**
-	 * Optional path to PhantomJs executable
+	 * Optional command to invoke phantomJs executable (can be space delimited commands).
 	 * 
-	 * @parameter expression="${phantomjs.path}"
-	 * @required
+	 * eg. 'xvfb-run -a /usr/bin/phantomjs'
+	 * 
+	 * If not set, then defaults to assuming the 'phantomjs' executable is in system path.
+	 * 
+	 * @parameter expression="${phantomjs.exec}" default-value="phantomjs"
 	 */
-	private String pathToPhantomJs;
+	private String phantomJsExec;
 
 	/**
 	 * Filenames of JS test files from the jsTestDirectory to exclude.
@@ -77,7 +82,6 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	private String[] mExcludes;
 	// XXX Add excludes logic
 
-	private static final String pathToResources = "src/main/resources";
 	private static final String qUnitJsFileName = "qunit-git.js";
 	private static final String phantomJsQunitRunner = "phantomjs-qunit-runner.js";
 	private static final String jsTestFileSuffix = "Test.js";
@@ -89,6 +93,11 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 
 	public void execute() throws MojoExecutionException, MojoFailureException {
 		int retCode = 0;
+		
+		getLog().debug("jsTestDirectory=" + String.valueOf(jsTestDirectory));
+		getLog().debug("jsSourceDirectory=" + String.valueOf(jsSourceDirectory));
+		getLog().debug("phantomJsExec=" + String.valueOf(phantomJsExec));
+		
 
 		// Go over all the js test files in jsTestDirectory
 		for (File temp : getJsTestFiles(jsTestDirectory.toString())) {
@@ -107,17 +116,23 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 
 	private int runQUnitInPhantomJs(String testFile, String testFileDirectory) {
 		int exitVal = 255;
+		
+		getLog().debug("testFile=" + testFile);
+		getLog().debug("testFileDirectory=" + testFileDirectory);
+		
 		try {
-			// Set paramaters
+			// Set parameters
 			// needs to be : phantomjs phantomjsqunitrunner qunit.js AbcTest.js
 			// Abc.js
 			// Abc.js
-			String[] params = new String[5];
+			String[] phantomJsExecArgs = phantomJsExec.split(" ");
+			ArrayList<String> paramsList = new ArrayList<String>();
+			for (String arg : phantomJsExecArgs) {
+				paramsList.add(arg);
+			}
+			
 			// XXX todo : unix executable. how to store and pull down from
 			// nexus?
-
-			// Set path to PhantomJs
-			params[0] = pathToPhantomJs + "/" + "phantomjs";
 
 			// Copy phantomJsQunitRunner and qUnitJsFileName over from
 			// phantomjs-qunit-runner plugin over for use..
@@ -133,20 +148,18 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 				e.printStackTrace();
 			}
 
-			// Set param 1 and 3 to the previously copied files
-			params[1] = buildDirectory + "/" + phantomJsQunitRunner;
-			params[2] = buildDirectory + "/" + qUnitJsFileName;
-			// params[1] =
-			// this.getClass().getClassLoader().getResource(phantomJsQunitRunner).toString();
-			// params[2] =
-			// this.getClass().getClassLoader().getResource(qUnitJsFileName).toString();
-			params[3] = testFileDirectory + "/" + testFile;
+			// Set further params for the previously copied files
+			paramsList.add(buildDirectory + "/" + phantomJsQunitRunner);
+			paramsList.add(buildDirectory + "/" + qUnitJsFileName);
+			paramsList.add(testFileDirectory + "/" + testFile);
+			
 			// Some dirty string manipulation here to resolve js src file
-			params[4] = jsSourceDirectory + "/"
+			paramsList.add(jsSourceDirectory + "/"
 					+ testFile.substring(0, testFile.indexOf(jsTestFileSuffix))
-					+ ".js";
+					+ ".js");
 
-			Process pr = new ProcessBuilder(params).start();
+			getLog().debug("params passed to process = " + paramsList.toString());
+			Process pr = new ProcessBuilder(paramsList).start();
 
 			// Grab STDOUT of execution (this is the junit xml output generated
 			// by the js), write to file
@@ -156,18 +169,20 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 					+ jUnitXmlDirectoryName);
 
 			jUnitXmlOutputPath.mkdir();
-			BufferedWriter output = new BufferedWriter(new FileWriter(
-					jUnitXmlOutputPath + "/" + testFile + ".xml"));
-
+			File resultsFile = new File(jUnitXmlOutputPath, testFile + ".xml");
+			
+			// Write out the stdout from phantomjs to the junit xml file.
+			BufferedWriter output = new BufferedWriter(new FileWriter(resultsFile));
 			String line = null;
 			while ((line = input.readLine()) != null) {
 				output.write(line);
 			}
+			output.close();			
 
-			output.close();
 			exitVal = pr.waitFor();
+			
 		} catch (Exception e) {
-			e.printStackTrace();
+			getLog().error(e);
 		}
 		return exitVal;
 	}
