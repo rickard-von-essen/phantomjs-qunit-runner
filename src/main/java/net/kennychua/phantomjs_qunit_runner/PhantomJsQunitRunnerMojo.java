@@ -82,6 +82,8 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	private String[] mExcludes;
 	// XXX Add excludes logic
 
+	private static final String jQueryFileName = "jquery-1.7.1-min.js";
+	private static final String domTestUtilsFileName = "DOMTestUtils.js";
 	private static final String qUnitJsFileName = "qunit-git.js";
 	private static final String phantomJsQunitRunner = "phantomjs-qunit-runner.js";
 	private static final String jsTestFileSuffix = "Test.js";
@@ -134,21 +136,24 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 			// XXX todo : unix executable. how to store and pull down from
 			// nexus?
 
-			// Copy phantomJsQunitRunner and qUnitJsFileName over from
-			// phantomjs-qunit-runner plugin over for use..
+			// Copy js phantomjs-qunit-runner plugin over for use..
+			// - phantomJsQunitRunner  	- wrapper so QUnit tests can run in PhantomJs
+			// - qUnitJsFileName		- QUnit Test framework
+			// - jQueryFileName			- jQuery library
+			// - domTestUtilsFileName	- DOM setup and teardown helper functions for DOM assert testings 
+			
 			try {
-				FileUtils.copyInputStreamToFile(
-						this.getClass().getClassLoader()
-								.getResourceAsStream(phantomJsQunitRunner),
-						new File(buildDirectory + "/" + phantomJsQunitRunner));
-				FileUtils.copyInputStreamToFile(this.getClass()
-						.getClassLoader().getResourceAsStream(qUnitJsFileName),
-						new File(buildDirectory + "/" + qUnitJsFileName));
+				FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(phantomJsQunitRunner), new File(buildDirectory + "/" + phantomJsQunitRunner));
+				FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(qUnitJsFileName),new File(buildDirectory + "/" + qUnitJsFileName));
+				FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(jQueryFileName),new File(buildDirectory + "/" + jQueryFileName));
+				FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(domTestUtilsFileName),new File(buildDirectory + "/" + domTestUtilsFileName));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 
 			// Set further params for the previously copied files
+			paramsList.add(buildDirectory + "/" + domTestUtilsFileName);
+			paramsList.add(buildDirectory + "/" + jQueryFileName);
 			paramsList.add(buildDirectory + "/" + phantomJsQunitRunner);
 			paramsList.add(buildDirectory + "/" + qUnitJsFileName);
 			paramsList.add(testFileDirectory + "/" + testFile);
