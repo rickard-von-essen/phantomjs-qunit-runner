@@ -58,25 +58,27 @@ function importJs(scriptName) {
 	phantom.injectJs(scriptName);
 }
 
-// Arg1 should be DOM Test helper util
+
+
+//Arg1 should be Phantomjs QUnit wrapper
 importJs(phantom.args[0]);
 
-//Arg2 should be jQuery
+//Arg2 should be QUnit
 importJs(phantom.args[1]);
 
-//Arg3 should be Phantomjs QUnit wrapper
-importJs(phantom.args[2]);
-
-//Arg4 should be QUnit
-importJs(phantom.args[3]);
-
-// Arg5 should be user tests
-var usrTestScript = phantom.args[4];
+// Arg3 should be user tests
+var usrTestScript = phantom.args[2];
 importJs(usrTestScript);
 
-// Arg6 should be user tests
-var usrSrcScript = phantom.args[5];
+// Arg4 should be user tests
+var usrSrcScript = phantom.args[3];
 importJs(usrSrcScript);
+
+//Arg5 should be DOM Test helper util
+importJs(phantom.args[4]);
+
+//Arg6 should be jQuery
+importJs(phantom.args[5]);
 
 // Run QUnit
 var testsPassed = 0;

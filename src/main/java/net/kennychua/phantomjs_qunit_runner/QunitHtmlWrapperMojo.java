@@ -44,11 +44,13 @@ public class QunitHtmlWrapperMojo extends AbstractMojo {
 	 */
 	private File buildDirectory;
 
+	private static final String jQueryFileName = "jquery-1.7.1-min.js";
+	private static final String domTestUtilsFileName = "DOMTestUtils.js";
 	private static final String qUnitJsFileName = "qunit-git.js";
 	private static final String qUnitCssFileName = "qunit-git.css";
 	private static final String jsTestFileSuffix = "Test.js";
 	private static final String qUnitHtmlOutputDirectoryName = "qunit-html";
-	private static final String qUnitHeader = "<html><head><title>QUnit Test Suite</title><link rel=\"stylesheet\" href=\"qunit-git.css\" type=\"text/css\" media=\"screen\"><script type=\"text/javascript\" src=\"qunit-git.js\"></script>";
+	private static final String qUnitHeader = "<html><head><title>QUnit Test Suite</title><link rel=\"stylesheet\" href=\"qunit-git.css\" type=\"text/css\" media=\"screen\"><script type=\"text/javascript\" src=\"qunit-git.js\"></script><script type=\"text/javascript\" src=\"jquery-1.7.1-min.js\"></script><script type=\"text/javascript\" src=\"DOMTestUtils.js\"></script>";
 	private static final String qUnitFooter = "</head><body><h1 id=\"qunit-header\">QUnit Test Suite</h1><h2 id=\"qunit-banner\"></h2><div id=\"qunit-testrunner-toolbar\"></div><h2 id=\"qunit-userAgent\"></h2><ol id=\"qunit-tests\"></ol></body></html>";
 	private static String qUnitHtmlOutputPath;
 
@@ -79,6 +81,8 @@ public class QunitHtmlWrapperMojo extends AbstractMojo {
 		try {
 			FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(qUnitCssFileName), new File(qUnitHtmlOutputPath + "/" + qUnitCssFileName));
 			FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(qUnitJsFileName), new File(qUnitHtmlOutputPath + "/" + qUnitJsFileName));
+			FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(jQueryFileName),new File(qUnitHtmlOutputPath + "/" + jQueryFileName));
+			FileUtils.copyInputStreamToFile(this.getClass().getClassLoader().getResourceAsStream(domTestUtilsFileName),new File(qUnitHtmlOutputPath + "/" + domTestUtilsFileName));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

@@ -152,8 +152,6 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 			}
 
 			// Set further params for the previously copied files
-			paramsList.add(buildDirectory + "/" + domTestUtilsFileName);
-			paramsList.add(buildDirectory + "/" + jQueryFileName);
 			paramsList.add(buildDirectory + "/" + phantomJsQunitRunner);
 			paramsList.add(buildDirectory + "/" + qUnitJsFileName);
 			paramsList.add(testFileDirectory + "/" + testFile);
@@ -162,6 +160,9 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 			paramsList.add(jsSourceDirectory + "/"
 					+ testFile.substring(0, testFile.indexOf(jsTestFileSuffix))
 					+ ".js");
+			
+			paramsList.add(buildDirectory + "/" + domTestUtilsFileName);
+			paramsList.add(buildDirectory + "/" + jQueryFileName);
 
 			getLog().debug("params passed to process = " + paramsList.toString());
 			Process pr = new ProcessBuilder(paramsList).start();
