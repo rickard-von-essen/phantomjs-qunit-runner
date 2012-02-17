@@ -47,7 +47,7 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	/**
 	 * Directory containing the build files
 	 * 
-	 * @parameter expression="${project.build.directory}"
+	 * @parameter expression="${project.build.directory}/qunit"
 	 */
 	private File buildDirectory;
 
@@ -78,9 +78,11 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
     private FileSet libraries;
 
 
-    private static final String[] coreLibraries = new String[]{
+    private static final String[] qunitLibraries = new String[] {
         "phantomjs-qunit-runner.js",    // - wrapper so QUnit tests can run in PhantomJs
-        "qunit-git.js",                 // - QUnit Test framework
+        "qunit-git.js"                 // - QUnit Test framework
+    };
+    private static final String[] tailLibraries = new String[] {
         "jquery-1.7.1-min.js",          // - jQuery library
         "DOMTestUtils.js"               // - DOM setup and teardown helper functions for DOM assert testings
     };
@@ -106,13 +108,11 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 
         printConfigurationToLog();
 
-        copyCoreLibraries();
-        copyUserDefinedLibraries();
-        ArrayList<String> paramsList = createParameterList();
+        copyFilesToTargetDirectory();
 
 		// Go over all the js test files in jsTestDirectory
-		for (File jsTestFile : getJsTestFiles(jsTestDirectory.toString())) {
-			retCode += runQUnitInPhantomJs(paramsList, jsTestFile.getName(), jsTestDirectory.toString());
+		for (File jsTestFile : getJsTestFiles(jsTestDirectory.getAbsolutePath())) {
+			retCode += runQUnitInPhantomJs(jsTestFile.getName(), jsTestDirectory.getAbsolutePath());
 		}
 
 		if (!ignoreFailures) {
@@ -123,6 +123,12 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 		}
 	}
 
+    private void copyFilesToTargetDirectory() {
+        copyLibraries(qunitLibraries);
+        copyLibraries(tailLibraries);
+        copyUserDefinedLibraries();
+    }
+
     private void printConfigurationToLog() {
         getLog().debug("jsTestDirectory=" + String.valueOf(jsTestDirectory));
         getLog().debug("jsSourceDirectory=" + String.valueOf(jsSourceDirectory));
@@ -132,15 +138,23 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
         getLog().debug("libraries=" + createStringArrayLogString(fileNames));
     }
 
-    private int runQUnitInPhantomJs(ArrayList<String> paramsList, String testFile, String testFileDirectory) {
+    private int runQUnitInPhantomJs(String testFile, String testFileDirectory) {
 		int exitVal = 255;
 		
 		getLog().debug("testFile=" + testFile);
 		getLog().debug("testFileDirectory=" + testFileDirectory);
 		
 		try {
+            ArrayList<String> paramsList = new ArrayList<String>();
+
+            paramsList.addAll(convertPhantomJsExecToParameterList());
+            paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(), qunitLibraries));
+
             paramsList.add(testFileDirectory + "/" + testFile);
             paramsList.add(findFileUnderTest(testFile));
+
+            paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(), tailLibraries));
+            paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(), fileSetManager.getIncludedFiles(libraries)));
 
             getLog().debug("params passed to process = " + paramsList.toString());
 
@@ -182,22 +196,6 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
         output.close();
     }
 
-    /**
-     * Set parameters
-     * needs to be : phantomjs phantomjsqunitrunner qunit.js AbcTest.js
-     * Abc.js
-     * Abc.js
-     */
-    private ArrayList<String> createParameterList() {
-        ArrayList<String> paramsList = new ArrayList<String>();
-
-        paramsList.addAll(convertPhantomJsExecToParameterList());
-        paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(), coreLibraries));
-        paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(), fileSetManager.getIncludedFiles(libraries)));
-
-        return paramsList;
-    }
-
     private ArrayList<String> convertPhantomJsExecToParameterList() {
         ArrayList<String> phantomJsParams = new ArrayList<String>();
         for (String arg : phantomJsExec.split(" ")) {
@@ -234,8 +232,8 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
     /**
      * Copy all the core libraries used by phantomjs-qunit-runner
      */
-    private void copyCoreLibraries() {
-        for (String filename: coreLibraries) {
+    private void copyLibraries(String[] filenames) {
+        for (String filename: filenames) {
             copyResourceToDirectory(filename, buildDirectory);
         }
     }
