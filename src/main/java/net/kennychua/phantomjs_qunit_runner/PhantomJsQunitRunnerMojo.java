@@ -140,9 +140,9 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 
 		if (includeLibsInDir != null) {
 			String[] fileNames = fileSetManager.getIncludedFiles(includeLibsInDir);
-			getLog().debug("libraries=" + createStringArrayLogString(fileNames));
+			getLog().debug("includeLibsInDir=" + createStringArrayLogString(fileNames));
 		} else {
-			getLog().debug("libraries=none");
+			getLog().debug("includeLibsInDir=none");
 		}
 	}
 
@@ -245,7 +245,7 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 					.getIncludedFiles(includeLibsInDir)) {
 				try {
 					File libraryFile = new File(includeLibsInDir.getDirectory()
-							+ libraryFileName);
+							+ File.separatorChar + libraryFileName);
 					FileUtils.copyFile(libraryFile, new File(buildDirectory
 							+ "/" + libraryFile.getName()));
 				} catch (IOException e) {

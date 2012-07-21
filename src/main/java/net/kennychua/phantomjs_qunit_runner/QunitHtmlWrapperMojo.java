@@ -103,9 +103,9 @@ public class QunitHtmlWrapperMojo extends AbstractMojo {
 					.getIncludedFiles(includeLibsInDir)) {
 				try {
 					File libraryFile = new File(includeLibsInDir.getDirectory()
-							+ libraryFileName);
+							+ File.separatorChar + libraryFileName);
 					FileUtils.copyFile(libraryFile, new File(
-							qUnitHtmlOutputPath + "/" + libraryFile.getName()));
+							qUnitHtmlOutputPath + File.separatorChar + libraryFile.getName()));
 				} catch (IOException e) {
 					getLog().error(e);
 				}
