@@ -21,14 +21,14 @@ var JUnitXmlFormatter = {
 							_testsFileName : testsFileName
 						}));
 	},
-	printJUnitXmlTestCasePass : function(testName, testRunTime) {
+	printJUnitXmlTestCasePass : function(testObject, testName, testRunTime) {
 		console.log("<testcase time=\"{_testRunTime}\" name=\"{_testName}\"/>"
 				.supplant({
 					_testRunTime : testRunTime,
 					_testName : testName
 				}));
 	},
-	printJUnitXmlTestCaseFail : function(testName, testRunTime, failureType,
+	printJUnitXmlTestCaseFail : function(testObject, testName, testRunTime, failureType,
 			failureMessage) {
 		console
 				.log("XXX<testcase time=\"{_testRunTime}\" name=\"{_testName}\">"
@@ -46,6 +46,19 @@ var JUnitXmlFormatter = {
 				.supplant({
 					_testName : testName
 				}));
+		var assertMsgAdded = false;
+		var i;
+		for( i = 0 ; i < logQueue.length ; ++i ) {
+			e = logQueue[i];
+			if( !e.result ) {
+				if( !assertMsgAdded ) {
+					console.log( ", failed assertions: ");
+					assertMsgAdded = true;
+				} else
+					console.log( ", ");
+				console.log( "'"+e.message+"'");
+			}
+		}
 		console.log("</failure>");
 		console.log("</testcase>");
 	},
@@ -108,9 +121,15 @@ QUnit.begin({});
 var oldconfig = extend({}, QUnit.config);
 QUnit.init();
 extend(QUnit.config, oldconfig);
+var logQueue = [];
+
+QUnit.log = function(details) {
+	logQueue.push(details);
+}
 
 QUnit.testStart = function(t) {
 	testStartDate = new Date();
+	logQueue = [];
 }
 
 QUnit.testDone = function(t) {
@@ -120,37 +139,67 @@ QUnit.testDone = function(t) {
 
 	if (0 === t.failed) {
 		testsPassed++;
-		JUnitXmlFormatter.printJUnitXmlTestCasePass(t.name, testRunTime);
+		JUnitXmlFormatter.printJUnitXmlTestCasePass(t, t.name, testRunTime);
 	} else {
 		testsFailed++;
-		JUnitXmlFormatter.printJUnitXmlTestCaseFail(t.name, testRunTime, 1, 1);
+		JUnitXmlFormatter.printJUnitXmlTestCaseFail(t, t.name, testRunTime, 1, 1);
 	}
 }
+
+// Test timeout for asynchronous tests in secs
+var testTimeOut = 1;
+// Length of one tick count in msec when checking the
+// status of async tests
+var tickLen = 50;		// in msecs
+var tickCounter = 0;
 
 var running = true;
 QUnit.done = function(i) {
 	running = false;
 }
 
-// Instead of QUnit.start(); just directly exec; the timer stuff seems to
-// invariably screw us up and we don't need it
-QUnit.config.semaphore = 0;
-while (QUnit.config.queue.length)
-	QUnit.config.queue.shift()();
+var started = 0;
 
-// wait for completion
-var ct = 0;
-while (running) {
-	if (ct++ % 1000000 == 0) {
-		// console.log('queue is at ' + QUnit.config.queue.length);
-	}
-	if (!QUnit.config.queue.length) {
-		QUnit.done();
+QUnit.start = function() {
+	++started;
+}
+
+QUnit.stop = function() {
+	--started;
+}
+
+function processQueue() {
+	while (QUnit.config.queue.length && ( started >= 0 ) )
+		QUnit.config.queue.shift()();
+	return QUnit.config.queue.length == 0;
+}
+
+function processAndWait() {
+	if( processQueue() ) {
+		JUnitXmlFormatter.printJUnitXmlOutputFooter();
+		phantom.exit(testsFailed);
+	} else {
+		tickCounter = testTimeOut * 1000 / tickLen;
+		setTimeout( waitAndContinue,50 );
 	}
 }
 
-JUnitXmlFormatter.printJUnitXmlOutputFooter();
+function waitAndContinue() {
+	if( started >= 0 )
+		processAndWait();
+	else {
+		--tickCounter;
+		if( tickCounter <= 0 ) {
+			QUnit.ok(false,"test timeout" );
+			++started;
+			processAndWait();
+		} else
+			setTimeout( waitAndContinue,50 );
+	}
+}
 
-// exit code is # of failed tests; this facilitates Ant failonerror.
-// Alternately, 1 if testsFailed > 0.
-phantom.exit(testsFailed);
+
+// Instead of QUnit.start(); just directly exec; the timer stuff seems to
+// invariably screw us up and we don't need it
+QUnit.config.semaphore = 0;
+processAndWait();
