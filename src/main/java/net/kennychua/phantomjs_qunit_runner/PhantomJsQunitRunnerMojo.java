@@ -246,8 +246,7 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 				try {
 					File libraryFile = new File(includeLibsInDir.getDirectory()
 							+ File.separatorChar + libraryFileName);
-					FileUtils.copyFile(libraryFile, new File(buildDirectory
-							+ "/" + libraryFile.getName()));
+					FileUtils.copyFile(libraryFile, new File(buildDirectory, libraryFileName));
 				} catch (IOException e) {
 					getLog().error(e);
 				}
