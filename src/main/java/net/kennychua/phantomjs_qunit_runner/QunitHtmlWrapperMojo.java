@@ -176,10 +176,8 @@ public class QunitHtmlWrapperMojo extends AbstractMojo {
 			output = new BufferedWriter(new FileWriter(qUnitHtmlOutputPath
 					+ "/" + jsTestFile + ".html"));
 			output.write(qUnitHeader);
-			output.write(generateScriptTag(jsSrcFile));
-			output.write(generateScriptTag(jsTestFile));
-
-			if (includeLibsInDir != null) {
+         
+      if (includeLibsInDir != null) {
 				for (String libraryFileName : fileSetManager
 						.getIncludedFiles(includeLibsInDir)) {
 					try {
@@ -189,6 +187,9 @@ public class QunitHtmlWrapperMojo extends AbstractMojo {
 					}
 				}
 			}
+         
+			output.write(generateScriptTag(jsSrcFile));
+			output.write(generateScriptTag(jsTestFile));
 
 			output.write(qUnitFooter);
 			output.close();
