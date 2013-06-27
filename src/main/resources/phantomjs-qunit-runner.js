@@ -1,205 +1,187 @@
-// Credit to Rod of http://whileonefork.blogspot.com/2011/07/javascript-unit-tests-with-qunit-ant.html for inspiration of this js file
-String.prototype.supplant = function(o) {
-	return this.replace(/{([^{}]*)}/g, function(a, b) {
-		var r = o[b];
-		return typeof r === 'string' || typeof r === 'number' ? r : a;
-	});
-};
-
-var JUnitXmlFormatter = {
-	someProperty : 'some value here',
-	printJUnitXmlOutputHeader : function(testsErrors, testsTotal,
-			testsTotalRunTime, testsFailures, testsFileName) {
-		console.log("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>");
-		console
-				.log("<testsuite errors=\"{_testsErrors}\" tests=\"{_testsTotal}\" time=\"{_testsTotalRunTime}\" failures=\"{_testsFailures}\" name=\"{_testsFileName}\">"
-						.supplant({
-							_testsErrors : testsErrors,
-							_testsTotal : testsTotal,
-							_testsTotalRunTime : testsTotalRunTime,
-							_testsFailures : testsFailures,
-							_testsFileName : testsFileName
-						}));
-	},
-	printJUnitXmlTestCasePass : function(testObject, testName, testRunTime) {
-		console.log("<testcase time=\"{_testRunTime}\" name=\"{_testName}\"/>"
-				.supplant({
-					_testRunTime : testRunTime,
-					_testName : testName
-				}));
-	},
-	printJUnitXmlTestCaseFail : function(testObject, testName, testRunTime, failureType,
-			failureMessage) {
-		console
-				.log("XXX<testcase time=\"{_testRunTime}\" name=\"{_testName}\">"
-						.supplant({
-							_testRunTime : testRunTime,
-							_testName : testName
-						}));
-		console
-				.log("<failure type=\"{_failureType}\" message=\"{_failureMessage}\">"
-						.supplant({
-							_failureType : failureType,
-							_failureMessage : failureMessage
-						}));
-		console.log("PhantomJS QUnit failure on test : '{_testName}'"
-				.supplant({
-					_testName : testName
-				}));
-		var assertMsgAdded = false;
-		var i;
-		for( i = 0 ; i < logQueue.length ; ++i ) {
-			e = logQueue[i];
-			if( !e.result ) {
-				if( !assertMsgAdded ) {
-					console.log( ", failed assertions: ");
-					assertMsgAdded = true;
-				} else
-					console.log( ", ");
-				console.log( "'"+e.message+"'");
-			}
-		}
-		console.log("</failure>");
-		console.log("</testcase>");
-	},
-	printJUnitXmlOutputFooter : function() {
-		console.log("</testsuite>");
-	}
-};
-
-function importJs(scriptName) {
-	phantom.injectJs(scriptName);
-}
-
-
-
 //Arg1 should be Phantomjs QUnit wrapper
-importJs(phantom.args[0]);
-
 //Arg2 should be QUnit
-importJs(phantom.args[1]);
-
-// Arg3 should be user tests
-var usrTestScript = phantom.args[2];
-importJs(usrTestScript);
-
-// Arg4 should be user tests
-var usrSrcScript = phantom.args[3];
-importJs(usrSrcScript);
-
+//Arg3 should be user tests
+//Arg4 should be user tests
 //Arg5 should be DOM Test helper util
-importJs(phantom.args[4]);
-
 //Arg6 should be jQuery
-importJs(phantom.args[5]);
 
-// Run QUnit
-var testsPassed = 0;
-var testsFailed = 0;
-var testStartDate;
-var testEndDate;
-var testRunTime;
-var totalRunTime = 0;
+phantom.exit((function(args){
+	for(var i = 0; i < args.length; ++i) {
+		phantom.injectJs(args[i]);
+	}
 
-// extend copied from QUnit.js
-function extend(a, b) {
-	for ( var prop in b) {
-		if (b[prop] === undefined) {
-			delete a[prop];
-		} else {
-			a[prop] = b[prop];
+	var props = {
+		qunit			: args[0],
+		test			: args[1],
+		source		: args[2],
+		DOMHelper	: args[3],
+		jQuery		: args[4]
+	};
+
+	var tests = [];
+	var fails = [];
+	var suites = [];
+	var module = {
+		name: props.source,
+		start: new Date()
+	}
+	var testStart = new Date();
+	totalFails = 0;
+
+	var closeModule = function(vals) {
+		var now = new Date();
+		vals.ts = now;
+		vals.time = now.getTime() - vals.start.getTime();
+		vals.failed = fails.length;
+		vals.total = tests.length;
+		suites.push(suiteXml(vals, tests.join('')));
+		tests = [];
+		fails = [];
+	}
+
+	QUnit.moduleStart = function(context) {
+		if ( tests.length ) {
+			closeModule(module);
 		}
+		module.name = context.name;
+		module.start = new Date();
+	};
+
+	QUnit.moduleDone = function(context) {
+		context.start = module.start;
+		closeModule(context);
+		module.start = new Date();
+	};
+
+	QUnit.testStart = function(context) {
+		testStart = new Date();
+	};
+
+	QUnit.log = function(context) {
+		if ( !context.result ) {
+			fails.push(failXml(context));
+			totalFails++;
+		}	
+	};
+
+	QUnit.testDone = function(context) {
+		context.time = new Date() - testStart;
+		if ( !context.module ) {
+			context.module = module.name;
+		}
+		tests.push(testXml(context,fails.join('')));
+	};
+
+	QUnit.done = function(context) {
+		running = false;
+	};
+
+	var reportXml = function(props,suites) {
+		console.log('<?xml version="1.0" encoding="UTF-8" ?>');
+		console.log('<testsuites name="'+props.source+'">');
+		console.log(propsXml(props));
+		console.log(suites);
+		console.log('</testsuites>');
+	};
+	
+	var propsXml = function(props) {
+		var r = [];
+		for (var key in props) {
+		  if (props.hasOwnProperty(key)) {
+				r.push('<property name="'+key+'" value="'+props[key]+'" />\n');
+		  }
+		}
+		return '<properties>\n'+r.join('')+'</properties>';
+	};
+
+	var suiteXml = function(vals, tests) {
+		var r = [];
+		r.push('<testsuite');
+		//r.push(' errors="'+errors+'"');
+		r.push(' failures="'+vals.failed+'"');
+		//r.push(' hostname=""');
+		r.push(' name="'+vals.name+'"');
+		r.push(' tests="'+vals.total+'"');
+		r.push(' time="'+vals.time+'"');
+		r.push(' timestamp="'+vals.ts+'">\n');
+		r.push(tests);
+		r.push('</testsuite>\n');
+		return r.join('');
+	};
+
+	var testXml = function(vars,fails) {
+		var r = [];
+		if ( fails.length ) {
+			r.push('<testcase');
+			r.push(' classname="'+vars.module+'"');
+			r.push(' name="'+vars.name+'"');
+			r.push(' time="'+vars.time+'">\n');
+			r.push(fails);
+			r.push('</testcase>\n');
+		} else {
+			r.push('<testcase');
+			r.push(' classname="'+vars.module+'" ');
+			r.push(' name="'+vars.name+'" ');
+			r.push(' time="'+vars.time+'" />\n');
+		}
+		return r.join('');
+	};
+
+	var failXml = function(vars) {
+		var type = 'phantomjs-qunit-runner';
+		var msg = entitize(vars.message);
+		var r = [];
+		msg += ':  expected &lt;'+vars.expected+'&gt;, but was: &lt;'+vars.actual+'&gt;';
+		r.push('<failure message="'+msg+'" type="'+type+'">');
+		r.push(type+': '+msg);
+		r.push('</failure>\n');
+		return r.join('');
+	};
+
+	var entitize = function(str) {
+		return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 	}
 
-	return a;
-}
-JUnitXmlFormatter.printJUnitXmlOutputHeader(0, testsPassed + testsFailed,
-		totalRunTime, testsFailed, usrTestScript);
-QUnit.begin({});
+	function extend(a, b) {
+	  for ( var prop in b) {
+	    if (b[prop] === undefined) {
+	      delete a[prop];
+	    } else {
+	      a[prop] = b[prop];
+	    }
+	  }
+		return a;
+	};
 
-// Initialize the config, saving the execution queue
-var oldconfig = extend({}, QUnit.config);
-QUnit.init();
-extend(QUnit.config, oldconfig);
-var logQueue = [];
+	QUnit.begin({});
+	var oldconfig = extend({}, QUnit.config);
+	QUnit.init();
+	extend(QUnit.config, oldconfig);
 
-QUnit.log = function(details) {
-	logQueue.push(details);
-}
-
-QUnit.testStart = function(t) {
-	testStartDate = new Date();
-	logQueue = [];
-}
-
-QUnit.testDone = function(t) {
-	testEndDate = new Date();
-	testRunTime = testEndDate.getTime() - testStartDate.getTime();
-	totalRunTime = parseInt(totalRunTime) + parseInt(testRunTime);
-
-	if (0 === t.failed) {
-		testsPassed++;
-		JUnitXmlFormatter.printJUnitXmlTestCasePass(t, t.name, testRunTime);
-	} else {
-		testsFailed++;
-		JUnitXmlFormatter.printJUnitXmlTestCaseFail(t, t.name, testRunTime, 1, 1);
+	var running = true;
+	testStart = new Date();
+	module.start = new Date();
+	
+	QUnit.config.semaphore = 0;
+	while (QUnit.config.queue.length){
+	  QUnit.config.queue.shift()();
 	}
-}
-
-// Test timeout for asynchronous tests in secs
-var testTimeOut = 1;
-// Length of one tick count in msec when checking the
-// status of async tests
-var tickLen = 50;		// in msecs
-var tickCounter = 0;
-
-var running = true;
-QUnit.done = function(i) {
-	running = false;
-}
-
-var started = 0;
-
-QUnit.start = function() {
-	++started;
-}
-
-QUnit.stop = function() {
-	--started;
-}
-
-function processQueue() {
-	while (QUnit.config.queue.length && ( started >= 0 ) )
-		QUnit.config.queue.shift()();
-	return QUnit.config.queue.length == 0;
-}
-
-function processAndWait() {
-	if( processQueue() ) {
-		JUnitXmlFormatter.printJUnitXmlOutputFooter();
-		phantom.exit(testsFailed);
-	} else {
-		tickCounter = testTimeOut * 1000 / tickLen;
-		setTimeout( waitAndContinue,50 );
+	var ct = 0;
+	while (running) {
+	  if (ct++ % 1000000 == 0) {
+	  }
+	  if (!QUnit.config.queue.length) {
+	    QUnit.done();
+	  }
 	}
-}
 
-function waitAndContinue() {
-	if( started >= 0 )
-		processAndWait();
-	else {
-		--tickCounter;
-		if( tickCounter <= 0 ) {
-			QUnit.ok(false,"test timeout" );
-			++started;
-			processAndWait();
-		} else
-			setTimeout( waitAndContinue,50 );
+	if ( tests.length ) {
+		closeModule(module);
 	}
-}
 
+	reportXml(props,suites.join(''));
+	
+	return totalFails;
 
-// Instead of QUnit.start(); just directly exec; the timer stuff seems to
-// invariably screw us up and we don't need it
-QUnit.config.semaphore = 0;
-processAndWait();
+})(phantom.args));
+
