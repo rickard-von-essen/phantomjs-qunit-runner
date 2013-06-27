@@ -167,16 +167,17 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 			paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(),
 					qunitLibraries));
 
-			paramsList.add(testFileDirectory + "/" + testFile);
-			paramsList.add(findFileUnderTest(testFile));
-
-			paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(),
-					tailLibraries));
 			if (includeLibsInDir != null) {
 				paramsList.addAll(createFileList(
 						buildDirectory.getAbsolutePath(),
 						fileSetManager.getIncludedFiles(includeLibsInDir)));
 			}
+         
+			paramsList.add(testFileDirectory + "/" + testFile);
+			paramsList.add(findFileUnderTest(testFile));
+
+			paramsList.addAll(createFileList(buildDirectory.getAbsolutePath(),
+					tailLibraries));
 
 			getLog().debug(
 					"params passed to process = " + paramsList.toString());
