@@ -4,7 +4,9 @@ package net.kennychua.phantomjs_qunit_runner;
  * This is not the cleanest code you will ever see....
  */
 import java.io.*;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Calendar;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.plugin.AbstractMojo;
@@ -21,6 +23,17 @@ import org.apache.maven.shared.model.fileset.util.FileSetManager;
  * @phase test
  */
 public class PhantomJsQunitRunnerMojo extends AbstractMojo {
+	
+	/**
+	 * Count number of tests run
+	 */
+	private int testCount;
+	
+	/**
+	 * Count number of tests failed
+	 */
+	private int errorCount;
+	
 	/**
 	 * Directory of JS src files to be tested.
 	 * 
@@ -36,13 +49,6 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	 * @required
 	 */
 	private File jsTestDirectory;
-
-	/**
-	 * Base directory of project/
-	 * 
-	 * @parameter expression="${basedir}"
-	 */
-	private File baseDirectory;
 
 	/**
 	 * Directory containing the build files
@@ -107,21 +113,23 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	}
 
 	public void execute() throws MojoExecutionException, MojoFailureException {
-		int retCode = 0;
+		errorCount = 0;
 
 		printConfigurationToLog();
 
 		copyFilesToTargetDirectory();
 
-		// Go over all the js test files in jsTestDirectory
-		for (File jsTestFile : getJsTestFiles(jsTestDirectory.getAbsolutePath())) {
-			retCode += runQUnitInPhantomJs(jsTestFile.getName(),
-					jsTestDirectory.getAbsolutePath());
-		}
+		BigDecimal startMs = BigDecimal.valueOf(Calendar.getInstance().getTimeInMillis());
+		getLog().info(" Start running javascript unit tests");
+		recursiveTraversal(jsTestDirectory);
+		BigDecimal elapsed = BigDecimal.valueOf(Calendar.getInstance().getTimeInMillis()).subtract(startMs);
+		System.out.println("\nJavascript Test Results:");
+		System.out.println("\n  Tests Run: " + testCount + "  Failures: " + errorCount
+			+ "  Time elapsed: " + elapsed.divide(BigDecimal.valueOf(1000d), 3, BigDecimal.ROUND_UP) + " sec\n");
 
 		if (!ignoreFailures) {
 			// If ever retCode is more than 1, it means error(s) have occurred
-			if (retCode > 0) {
+			if (errorCount > 0) {
 				throw new MojoFailureException("One or more QUnit tests failed");
 			}
 		}
@@ -276,14 +284,32 @@ public class PhantomJsQunitRunnerMojo extends AbstractMojo {
 	private InputStream getFileAsStream(String filename) {
 		return this.getClass().getClassLoader().getResourceAsStream(filename);
 	}
-
-	private File[] getJsTestFiles(String dirName) {
-		File dir = new File(dirName);
-
-		return dir.listFiles(new FilenameFilter() {
-			public boolean accept(File dir, String filename) {
-				return filename.endsWith(jsTestFileSuffix);
+	
+	/**
+	 * Traverse sub-directories in the fileObject param and run all tests 
+	 * @param fileObject
+	 */
+	public void recursiveTraversal(File fileObject) {
+		if (fileObject.isDirectory()) {
+			File allFiles[] = fileObject.listFiles();
+			for (File aFile : allFiles) {
+				recursiveTraversal(aFile);
 			}
-		});
+		} else if (fileObject.isFile()) {
+			if (fileObject.getName().endsWith(jsTestFileSuffix)) {
+				testCount += 1;
+				
+				int errorCode = runQUnitInPhantomJs(fileObject.getName(),
+						fileObject.getAbsolutePath());
+				String logMessage = "Running " + fileObject.getName();
+				if (errorCode > 0) {
+					errorCount += 1;
+					logMessage += " >> FAILED!";
+				} else {
+					logMessage += " >> PASSED!";
+				}
+				getLog().info(logMessage);
+			}
+		}
 	}
 }
